@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 
 namespace BlazorComponent.I18n;
@@ -68,33 +69,45 @@ public class I18n
 
     public IEnumerable<CultureInfo> SupportedCultures => I18nCache.GetCultures();
 
-    public string? T(string? key, bool matchLastLevel = false, bool whenNullReturnKey = true, params object[] args)
+    [return: NotNullIfNotNull("defaultValue")]
+    public string? T(string? key, [DoesNotReturnIf(true)] bool whenNullReturnKey = true, string? defaultValue = null, params object[] args)
     {
+        string? value;
+
         if (key is null)
         {
-            return null;
+            value = null;
         }
-
-        var value = Locale.GetValueOrDefault(key);
-
-        if (value is null && matchLastLevel)
+        else
         {
-            var matchKey = Locale.Keys.FirstOrDefault(k => k.EndsWith($".{key}"));
+            value = Locale.GetValueOrDefault(key);
 
-            if (matchKey is not null)
+            if (value is null && whenNullReturnKey)
             {
-                value = Locale[matchKey];
+                if (key.StartsWith(".") || key.EndsWith("."))
+                {
+                    value = key;
+                }
+                else
+                {
+                    value = key.Split('.').Last();
+                }
             }
         }
 
-        if (value is null && whenNullReturnKey)
+        if (value is null)
         {
-            return key.Split('.').Last();
+            return defaultValue;
+        }
+
+        if (args.Length == 0)
+        {
+            return value;
         }
 
         try
         {
-            return value is null ? null : string.Format(value, args);
+            return string.Format(value, args);
         }
         catch (FormatException)
         {
@@ -102,23 +115,47 @@ public class I18n
         }
     }
 
-    public string? T(string? scope, string? key, bool whenNullReturnKey = true, params object[] args)
+    [return: NotNullIfNotNull("defaultValue")]
+    public string? T(string? scope, string? key, [DoesNotReturnIf(true)] bool whenNullReturnKey = true,
+        [CallerArgumentExpression("key")] string? defaultValue = null,
+        params object[] args)
     {
+        string? value;
+
         if (key is null)
         {
-            return null;
+            value = null;
+        }
+        else
+        {
+            value = Locale.GetValueOrDefault($"{scope}.{key}");
+
+            if (value is null && whenNullReturnKey)
+            {
+                if (key.StartsWith(".") || key.EndsWith("."))
+                {
+                    value = key;
+                }
+                else
+                {
+                    value = key.Split('.').Last();
+                }
+            }
         }
 
-        var value = Locale.GetValueOrDefault($"{scope}.{key}");
-
-        if (value is null && whenNullReturnKey)
+        if (value is null)
         {
-            return key.Split('.').Last();
+            return defaultValue;
+        }
+
+        if (args.Length == 0)
+        {
+            return value;
         }
 
         try
         {
-            return value is null ? null : string.Format(value, args);
+            return string.Format(value, args);
         }
         catch (FormatException)
         {
